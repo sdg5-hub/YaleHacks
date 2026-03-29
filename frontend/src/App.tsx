@@ -60,6 +60,85 @@ const garmentPlaceholders = [
   },
 ];
 
+type ImpactSection = {
+  title: string;
+  points: string[];
+};
+
+function cleanSummaryLine(line: string) {
+  return line
+    .replace(/\*\*/g, "")
+    .replace(/\*/g, "")
+    .replace(/[–—]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isSectionHeading(text: string) {
+  if (!text) return false;
+  if (text.includes("(") || text.includes(")") || text.includes(":")) return false;
+  if (text.split(" ").length > 6) return false;
+  return !text.includes(" - ");
+}
+
+function parseImpactSummary(summary: string) {
+  const lines = summary
+    .split(/\r?\n/)
+    .map(cleanSummaryLine)
+    .filter(Boolean);
+
+  const sections: ImpactSection[] = [];
+  const intro: string[] = [];
+  let current: ImpactSection | null = null;
+
+  for (const line of lines) {
+    const bullet = line.replace(/^-+\s*/, "").trim();
+    const wasBullet = bullet !== line;
+
+    if (!wasBullet && !current && intro.length === 0) {
+      intro.push(line);
+      continue;
+    }
+
+    if (isSectionHeading(bullet)) {
+      current = { title: bullet, points: [] };
+      sections.push(current);
+      continue;
+    }
+
+    if (!current) {
+      current = { title: "Overview", points: [] };
+      sections.push(current);
+    }
+
+    current.points.push(bullet);
+  }
+
+  return { intro: intro.join(" "), sections };
+}
+
+function ImpactReadCard({ summary }: { summary: string }) {
+  const { intro, sections } = parseImpactSummary(summary);
+
+  return (
+    <div className="impact-read-card">
+      {intro ? <p className="impact-read-intro">{intro}</p> : null}
+      <div className="impact-read-sections">
+        {sections.map((section, index) => (
+          <section className="impact-read-section" key={`${section.title}-${index}`}>
+            <h4>{section.title}</h4>
+            <ul>
+              {section.points.map((point, pointIndex) => (
+                <li key={`${pointIndex}-${point.slice(0, 24)}`}>{point}</li>
+              ))}
+            </ul>
+          </section>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const formId = useId();
   const [items, setItems] = useState<WardrobeItem[]>(() => [newItem(), newItem()]);
@@ -391,7 +470,7 @@ export default function App() {
                       {it.summary ? (
                         <div className="result-block tight">
                           <label>Impact read</label>
-                          <div className="box small">{it.summary}</div>
+                          <ImpactReadCard summary={it.summary} />
                         </div>
                       ) : null}
                     </div>
